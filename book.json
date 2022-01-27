@@ -1,0 +1,17 @@
+{
+    "title": "FFMpeg Guide",
+    "author": "Gao Jiangjie",
+    "language": "zh-hans",
+    "structure": {
+        "readme": "README.md"
+    },
+    "plugins": [
+        "-sharing",
+        "-fontsettings",
+        "copy-code-button",
+        "anchor-navigation-ex",
+        "search-pro"
+    ],
+    "pluginsConfig":{
+    }
+}

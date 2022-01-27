@@ -1,0 +1,4 @@
+example/build/*
+example/lib/*
+node_modules/*
+_book/*
