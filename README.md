@@ -1,3 +1,3 @@
-# FFmpeg Guide
+# Live Guide📖
 
-记录FFmpeg的功能分析、使用方法和遇到的问题，给FFmpeg的开发提供参考文献。
+记录分享多媒体交互中常用的网络协议编解码知识。
