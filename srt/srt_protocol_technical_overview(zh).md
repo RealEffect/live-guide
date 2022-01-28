@@ -106,7 +106,7 @@ SRT协议控制报文头("packet type" bit=1)，其结构如下(未包含udp头)
 对于控制报文，头两个字段分别解释如下：
 
 * 头32bit：
-  1) bit0: 类型，1就是控制报文
+  1) bit0: 类型，0是数据报文，1是控制报文
   2) bits1-15: 消息类型
   3) bits16-31: 消息扩展类型
   | type | Extended Type | description                                  |
@@ -293,7 +293,7 @@ send buffer的内容会被加入到应用线程中(sender线程)。然后有另�
 
 ### Packet Retransmission (NAKs)
 
-如果packet 4到达了接受者的buffer，但是packet 3并没有到达，NAK报文就需要发送给发送着。NAK被加到一个列表(周期的NAK报告)，其周期的发送给发送方，以此避免NAK报文本身传输中丢失或延迟到达。
+如果packet 4到达了接受者的buffer，但是packet 3并没有到达，NAK报文就需要发送给发送方。NAK被加到一个列表(周期的NAK报告)，其周期的发送给发送方，以此避免NAK报文本身传输中丢失或延迟到达。
 
 ![srt_nak](resource/pic/SRT_NAKs.png)
 
@@ -362,19 +362,19 @@ Round Trip Time(RTT)是时间的度量，表示报文一个来回的耗时。SRT
 
 ![acks send](resource/pic/ACK_send.png)
 
-ACKACK告诉接收者停止发送对应便宜点的ACK，因为发送端已经知道接收端收到了。否则，ACK(带有过时信息)将被持续的周期发送。类似的，如果发送端没有收到ACK，它自己也会周期发送没有收到ACK的packet。
+ACKACK告诉接收者停止发送对应的ACK，因为发送端已经知道接收端收到了。否则，ACK(带有过时信息)将被持续的周期发送。类似的，如果发送端没有收到ACK，它自己也会周期发送没有收到ACK的packet。
 
-有两种情况发送ACK。一个full ACK是基于10ms(ACK周期)发送。对于高bitrate的传输，一种"light ACK"就能被发送，期是多个packet的一个sequence。在10ms的间隔里，经常有大量packet的发送和接收，以至于发送端ACK的偏移点不能够快的移动。为了减轻这个问题，在收到64packets后(即使ACK发送周期还没到)，发送端发送一个light ACK。
+有两种情况发送ACK。一个`full ACK`是基于10ms(ACK周期)发送。对于高比特率的传输，一种`light ACK`就能被发送，期是多个packet的一个sequence。在10ms的间隔里，经常有大量packet的发送和接收，以至于发送端ACK的偏移点不能够快的移动。为了减轻这个问题，在收到64个packet后(即使ACK发送周期还没到)，发送端发送一个`light ACK`。
 
 ![ackack send](resource/pic/ackack_send.png)
 
 ACK动作像ping报文，而ACKACK像ping back回复，以此可以度量出RTT。每个ACK都有一个数值，而ACKACK也有相同的一个数值。接收方有一个ACK的列表去匹配ACKACK。不像full ACK报文(包含当前的RTT和多个其他的控制信息参数)，light ACK包含sequence数值(如下表所示)。在接收端，所有控制消息被直接发送和处理，但是ACKACK的处理时间是微不足道的(因为它的处理时间被包括在RTT里面)。
 
-RTT是在接收端被计算出来的，并且发送下一个full ACK。注意，第一个ACK包含的RTT值默认是100ms，因为早期的计算可能不准确。
+RTT是在接收端被计算出来的，并且发送下一个full ACK。注意，第一个ACK包含的RTT值默认是100ms，因为早期的计算可能不准确。（*实际上通过对libsrt的ack抓包分析也并不是这样，第一个ack包已经是通过数据传输统计预估的RTT值*）
 
 ![ack_ackack_formats](resource/pic/ack_ackack_formats.png)
 
-发送端永远都是通过接收端获取到RTT。没有一个方法来模拟ACK/ACKACK机制(举例，不可能发送一个消息，这个消息不处理而立刻返回)。
+发送端永远都是通过接收端获取到RTT。没有一个方法来模拟ACK/ACKACK机制(srt中除了ACK/ACK2外不可能发送一个消息，这个消息不处理而立刻返回)。
 
 ### Dirft Management: 偏移管理
 
@@ -424,7 +424,7 @@ UDT用最大带宽设置来控制packet输出速率。这个固定值设定对�
 
 ![packet_pacing_interval](resource/pic/packet_pacing_interval.png)
 
-传输速度是通过packet之间的定时器来控制的。在老的代码中，packet周期是通过拥塞控制模块来调整的。基于从网络的反馈，packet间隔可以突然减小来加速，或突然增加来减速。但是这在SRT的直播模式中并不适合。音视频流bitrate是在mpegts packet形成，修改出口packet pace病不能影响到接收方单个的流rate--它会影响到解码。早期SRT是在一个周期里，输出rate与输入input相当。默认情况下，SRT测量input流的bitrate，根据这个来调整packet period。
+传输速度是通过packet之间的定时器来控制的。在老的代码中，packet周期是通过拥塞控制模块来调整的。基于从网络的反馈，packet间隔可以突然减小来加速，或突然增加来减速。但是这在SRT的直播模式中并不适合。音视频流bitrate是在mpegts packet形成，修改出口packet pace并不能影响到接收方单个的流码率--它会影响到解码。早期SRT是在一个周期里，输出rate与输入input相当。默认情况下，SRT测量input流的bitrate，根据这个来调整packet period。
 
 SRT需要一个确定的足够带宽(比预想的带宽略高)，为了有空间插入更多的重发packet，而不影响SRT发送者的主流输出速度太多而导致packet不能正确发送。唯一的办法是通过network的反馈来降低拥塞，来控制编码器的输出(SRT的输入)。不太可能对已经打包到预想bitrate的packet进行调整，因为这个预设定的速度已经是解码器想要的速度了。
 

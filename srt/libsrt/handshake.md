@@ -5,46 +5,43 @@ Last updated: 2018-06-28
 
 **Contents**
 
-- [Overview](#overview)
-- [Short Introduction to SRT Packet Structure](#short-introduction-to-srt-packet-structure)
-- [Handshake Structure](#handshake-structure)
-- [The "UDT Legacy" and "SRT Extended" Handshakes](#the-udt-legacy-and-srt-extended-handshakes)
-  - [UDT Legacy Handshake](#udt-legacy-handshake)
-  - [Initiator and Responder](#initiator-and-responder)
-  - [The Request Type Field](#the-request-type-field)
-  - [The Type Field](#the-type-field)
-- [The Caller-Listener Handshake](#the-caller-listener-handshake)
-  - [The Induction Phase](#the-induction-phase)
-  - [The Conclusion Phase](#the-conclusion-phase)
-- [The Rendezvous Handshake](#the-rendezvous-handshake)
-  - [HSv4 Rendezvous Process](#hsv4-rendezvous-process)
-  - [HSv5 Rendezvous Process](#hsv5-rendezvous-process)
-    - [Serial Handshake Flow](#serial-handshake-flow)
-    - [Parallel Handshake Flow](#parallel-handshake-flow)
-  - [Rendezvous Between Different Versions](#rendezvous-between-different-versions)
-- [The SRT Extended Handshake](#the-srt-extended-handshake)
-  - [HSv4 Extended Handshake Process](#hsv4-extended-handshake-process)
-  - [HSv5 Extended Handshake Process](#hsv5-extended-handshake-process)
-  - [SRT Extension Commands](#srt-extension-commands)
-    - [HSREQ and HSRSP](#hsreq-and-hsrsp)
-    - [KMREQ and KMRSP](#kmreq-and-kmrsp)
-    - [Congestion controller](#congestion-controller)
-    - [Stream ID (SID)](#stream-id-sid)
+- [SRT Handshake](#srt-handshake)
+  - [Overview](#overview)
+  - [Short Introduction to SRT Packet Structure](#short-introduction-to-srt-packet-structure)
+  - [Handshake Structure](#handshake-structure)
+  - [The "UDT Legacy" and "SRT Extended" Handshakes](#the-udt-legacy-and-srt-extended-handshakes)
+    - [UDT Legacy Handshake](#udt-legacy-handshake)
+    - [Initiator and Responder](#initiator-and-responder)
+    - [The Request Type Field](#the-request-type-field)
+    - [The Type Field](#the-type-field)
+  - [The Caller-Listener Handshake](#the-caller-listener-handshake)
+    - [The Induction Phase](#the-induction-phase)
+    - [The Conclusion Phase](#the-conclusion-phase)
+  - [The Rendezvous Handshake](#the-rendezvous-handshake)
+    - [HSv4 Rendezvous Process](#hsv4-rendezvous-process)
+    - [HSv5 Rendezvous Process](#hsv5-rendezvous-process)
+      - [Serial Handshake Flow](#serial-handshake-flow)
+      - [Parallel Handshake Flow](#parallel-handshake-flow)
+    - [Rendezvous Between Different Versions](#rendezvous-between-different-versions)
+  - [The SRT Extended Handshake](#the-srt-extended-handshake)
+    - [HSv4 Extended Handshake Process](#hsv4-extended-handshake-process)
+    - [HSv5 Extended Handshake Process](#hsv5-extended-handshake-process)
+    - [SRT Extension Commands](#srt-extension-commands)
+      - [HSREQ and HSRSP](#hsreq-and-hsrsp)
+      - [KMREQ and KMRSP](#kmreq-and-kmrsp)
+      - [Congestion controller](#congestion-controller)
+      - [Stream ID (SID)](#stream-id-sid)
 
 
 ## Overview
 
-SRT is a connection protocol, and as such it embraces the concepts of "connection"
-and "session". The UDP system protocol is used by SRT for sending data as well as
-special control packets, also referred to as "commands".
+SRT is a connection protocol, and as such it embraces the concepts of "connection" and "session". The UDP system protocol is used by SRT for sending data as well as special control packets, also referred to as "commands".
 
 An SRT connection is characterized by the fact that it is:
 
 - first engaged by a *handshake* process
 - maintained as long as any packets are being exchanged in a timely manner
-- considered closed when a party receives the appropriate close command from
-its peer (connection closed by the foreign host), or when it receives no
-packets at all for some predefined time (connection broken on timeout).
+- considered closed when a party receives the appropriate close command from its peer (connection closed by the foreign host), or when it receives no packets at all for some predefined time (connection broken on timeout).
 
 Just like its predecessor UDT, SRT supports two connection configurations:
 
@@ -53,13 +50,8 @@ Just like its predecessor UDT, SRT supports two connection configurations:
 
 As SRT development has evolved, two handshaking mechanisms have emerged:
 
-1. the **legacy UDT handshake**, with the "SRT" part of the handshake implemented 
-as extended control messages; this is the only mechanism in SRT versions 1.2 and 
-lower, and is known as **HSv4** (where the number 4 refers to the last UDT 
-version)
-2. the new **integrated handshake**, known as **HSv5**, where all the required
-information concerning the connection is interchanged completely in the
-handshake process
+1. the **legacy UDT handshake**, with the "SRT" part of the handshake implemented as extended control messages; this is the only mechanism in SRT versions 1.2 and lower, and is known as **HSv4** (where the number 4 refers to the last UDT version)
+2. the new **integrated handshake**, known as **HSv5**, where all the required information concerning the connection is interchanged completely in the handshake process
 
 The version compatibility requirements are such that if one side of the
 connection only understands *HSv4*, the connection is made according to *HSv4*
@@ -83,23 +75,18 @@ versions of SRT by setting the minimum version 1.3.0 as shown above.
 
 ## Short Introduction to SRT Packet Structure
 
-Every UDP packet carrying SRT traffic contains an SRT header (immediately after 
-the UDP header). In all versions, the SRT header contains four major 32-bit fields:
+Every UDP packet carrying SRT traffic contains an SRT header (immediately after the UDP header). In all versions, the SRT header contains four major 32-bit fields:
 
- - `PH_SEQNO`
- - `PH_MSGNO`
- - `PH_TIMESTAMP`
- - `PH_ID`
+- `PH_SEQNO`
+- `PH_MSGNO`
+- `PH_TIMESTAMP`
+- `PH_ID`
 
-Their interpretation depends on the type of packet, of which there are two: 
-*control packets* and *data packets*, defined by the first bit in the `PH_SEQNO` 
-field. 
+Their interpretation depends on the type of packet, of which there are two: *control packets* and *data packets*, defined by the first bit in the `PH_SEQNO` field.
 
-Here, for example, is a representation of an SRT 1.3.0 **data packet header** 
-(where the "packet type" bit = 0):
+Here, for example, is a representation of an SRT 1.3.0 **data packet header** (where the "packet type" bit = 0):
 
-
-```
+```txt
    0                   1                   2                   3
    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -112,10 +99,10 @@ Here, for example, is a representation of an SRT 1.3.0 **data packet header**
    |                    Destination Socket ID                      |
    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ```
+
 **NOTE:** Packet diagrams in this document are in network bit order.
 
-While a complete description of a data packet is out of scope for this document, 
-here is a description of some other header fields unique to SRT:
+While a complete description of a data packet is out of scope for this document, here is a description of some other header fields unique to SRT:
 
 - **FF** = (2 bits) Position of packet in message, where:
   - 10b = 1st
@@ -297,50 +284,29 @@ versions of the protocol:
 NOT REWRITE** the `Version` field (it's simply blindly copied from the
 handshake request message received).
 
-2. The size of the handshake message must be **exactly** equal to the legacy UDT
-handshake structure, otherwise the message is silently rejected.
+2. The size of the handshake message must be **exactly** equal to the legacy UDT handshake structure, otherwise the message is silently rejected.
 
-As of SRT version 1.3.0 with HSv5 the handshake must only satisfy the minimum
-size. However, the code cannot rely on this until each peer is certain about
-the SRT version of the other.
+As of SRT version 1.3.0 with HSv5 the handshake must only satisfy the minimum size. However, the code cannot rely on this until each peer is certain about the SRT version of the other.
 
-Even in HSv5, the **Caller** must first set two fields in the initial handshake
-message:
+Even in HSv5, the **Caller** must first set two fields in the initial handshake message:
+
 - `Version` = 4
 - `Type` = `UDT_DGRAM`
 
 The version recognition relies on the fact that the **Listener** returns a
-version of 5 (or potentially higher) if it is capable, but the **Caller** must 
-set the `Version` to 4 to make sure that the Listener copies this value, which 
-is how an HSv4 client is recognized. This allows SRT to handle the following 
-combinations:
+version of 5 (or potentially higher) if it is capable, but the **Caller** must set the `Version` to 4 to make sure that the Listener copies this value, which is how an HSv4 client is recognized. This allows SRT to handle the following combinations:
 
-1. **HSv5 Caller vs. HSv4 Listener:** The Listener returns version 4 to the Caller,
-so the Caller knows it should use HSv4, and then continues the handshake the old way.
+1. **HSv5 Caller vs. HSv4 Listener:** The Listener returns version 4 to the Caller, so the Caller knows it should use HSv4, and then continues the handshake the old way.
 
-2. **HSv4 Caller vs. HSv5 Listener:** The Caller sends version 4 and the Listener
-returns version 5. The Caller ignores this value, however, and sends the
-second phase of the handshake still using version 4. This is how the Listener
-recognizes the HSv4 client.
+2. **HSv4 Caller vs. HSv5 Listener:** The Caller sends version 4 and the Listener returns version 5. The Caller ignores this value, however, and sends the second phase of the handshake still using version 4. This is how the Listener recognizes the HSv4 client.
 
-3. **Both HSv5:** The Listener responds with version 5 (or potentially higher in
-future) and the HSv5 Caller recognizes this value as HSv5 (or higher). The Caller
-then initiates the second phase of the handshake according to HSv5
-rules.
+3. **Both HSv5:** The Listener responds with version 5 (or potentially higher in future) and the HSv5 Caller recognizes this value as HSv5 (or higher). The Caller then initiates the second phase of the handshake according to HSv5 rules.
 
-With **Rendezvous** there's no problem because both sides try to
-connect to one another, so there's no copying of the handshake data. Each
+With **Rendezvous** there's no problem because both sides try to connect to one another, so there's no copying of the handshake data. Each
 side crafts its own handshake individually. If the value of the `Version`
-field is 5 from the very beginning, and if there are any extension flags set in 
-the `Type` field (see note below), the rules of HSv5 apply. But if one party is 
-using version 4, the handshake continues as HSv4.
+field is 5 from the very beginning, and if there are any extension flags set in the `Type` field (see note below), the rules of HSv5 apply. But if one party is using version 4, the handshake continues as HSv4.
 
-**NOTE**: Previously, the `Type` field contained only the extension flags, but 
-now it also contains the encryption flag. So for HSv5 rules to apply the 
-extension flag needs to be expressly set.
-
-[Return to top of page](#srt-handshake)
-
+**NOTE**: Previously, the `Type` field contained only the extension flags, but now it also contains the encryption flag. So for HSv5 rules to apply the extension flag needs to be expressly set.
 
 ## The "UDT Legacy" and "SRT Extended" Handshakes
 

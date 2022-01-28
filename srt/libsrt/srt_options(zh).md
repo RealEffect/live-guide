@@ -251,7 +251,7 @@ for a process that runs as root. Otherwise the function that applies the setting
 | ------------------ | ----- | ------- | --------- | ------ | -------- | ------ | --- | ------ |
 | `SRTO_CONNTIMEO`   | 1.1.2 | pre     | `int32_t` | msec   | 3000     | 0..    | W   | GSD+   |
 
-- 连接超时时长，单位毫秒。此选项适用于连接发起者和集合连接模式。对于集合模式（请参见[SRTO_RENDEZVOUS](#SRTO_RENDEZVOUS)），有效连接超时是使用`SRTO_CONNTIMEO`值的10倍。
+- 连接超时时长，单位毫秒。此选项适用于连接发起者和集合连接模式。对于对等连接模式（请参见[SRTO_RENDEZVOUS](#SRTO_RENDEZVOUS)），有效连接超时是使用`SRTO_CONNTIMEO`值的10倍。
 
 #### SRTO_DRIFTTRACER
 
@@ -290,7 +290,9 @@ for a process that runs as root. Otherwise the function that applies the setting
 | ----------------- | ----- | ------- | --------- | ------ | -------- | ------ | --- | ------ |
 | `SRTO_FC`         |       | pre     | `int32_t` | pkts   | 25600    | 32..   | RW  | GSD    |
 
-- 飞行标志大小，即未经确认的可发送的最大字节数。
+- 飞行数据报数量，即未经确认的可发送的最大字节数。
+
+>飞行数据指的是不用确认就可以发送的数据，也可以理解为在发送链路中的数据。
 
 #### SRTO_GROUPCONNECT
 
@@ -494,14 +496,9 @@ for more details.
 | -------------------- | ----- | ------- | ---------- | ------- | -------- | ------ | --- | ------ |
 | `SRTO_MINVERSION`    | 1.3.0 | pre     | `int32_t`  | version | 0        | *      | W   | GSD    |
 
-- The minimum SRT version that is required from the peer. A connection to a
-peer that does not satisfy the minimum version requirement will be rejected.
-See [`SRTO_VERSION`](#SRTO_VERSION) for the version format.
+- 支持建立连接的最低SRT版本。不满足最低版本要求的握手将被拒绝。
 
-
-[Return to list](#list-of-options)
-
-
+>版本号数据格式参考☞[SRT Handshake](./handshake.md)。
 
 #### SRTO_MSS
 
@@ -509,9 +506,9 @@ See [`SRTO_VERSION`](#SRTO_VERSION) for the version format.
 | -------------------- | ----- | ------- | ---------- | ------- | -------- | ------ | --- | ------ |
 | `SRTO_MSS`           |       | pre     | `int32_t`  | bytes   | 1500     | 76..   | RW  | GSD    |
 
-- 最大段大小，提交给IP层最大分段大小。用于缓冲区分配和速率计算，使用数据包计数器假定数据包已满。各方可以独立设置自己的MSS值。在握手过程中，双方交换MSS值，并使用最低值。
+- 提交给IP层最大分段大小。用于缓冲区分配和速率计算，计算时假定每个数据包都是满的。各方可以独立设置自己的MSS值。在握手过程中，双方交换MSS值，并使用最低值。
 
-> 通常在因特网上，默认MSS是1500。这是UDP数据包的最大大小，只能减小，除非在一些特殊专用网络中。此大小表示IP数据包的大小，包括了UDP和SRT包头。
+> 通常默认的MSS是1500。这是UDP数据包的最大大小，只能减小，除非在一些特殊专用网络中。此大小表示IP数据包的大小，包括了UDP和SRT包头。
 
 #### SRTO_NAKREPORT
 
@@ -519,17 +516,9 @@ See [`SRTO_VERSION`](#SRTO_VERSION) for the version format.
 | -------------------- | ----- | ------- | ---------- | ------- | -------- | ------ | --- | ------ |
 | `SRTO_NAKREPORT`     | 1.1.0 | pre     | `bool`     |         |  *       |        | RW  | GSD+   |
 
-- When set to true, every report for a detected loss will be repeated when the
-timeout for the expected retransmission of this loss has expired and the
-missing packet still wasn't recovered, or wasn't conditionally dropped (see
-[`SRTO_TLPKTDROP`](#SRTO_TLPKTDROP)).
+- When set to true, every report for a detected loss will be repeated when the timeout for the expected retransmission of this loss has expired and the missing packet still wasn't recovered, or wasn't conditionally dropped (see[`SRTO_TLPKTDROP`](#SRTO_TLPKTDROP)).
 
 - The default is true for Live mode, and false for File mode (see [`SRTO_TRANSTYPE`](#SRTO_TRANSTYPE)).
-
-
-[Return to list](#list-of-options)
-
-
 
 #### SRTO_OHEADBW
 
@@ -537,30 +526,15 @@ missing packet still wasn't recovered, or wasn't conditionally dropped (see
 | -------------------- | ----- | ------- | ---------- | ------- | -------- | ------ | --- | ------ |
 | `SRTO_OHEADBW`       | 1.0.5 | post    | `int32_t`  | %       | 25       | 5..100 | RW  | GSD    |
 
-- Recovery bandwidth overhead above input rate (see `[`SRTO_INPUTBW`](#SRTO_INPUTBW)`), 
-in percentage of the input rate. It is effective only if `SRTO_MAXBW` is set to 0.
+- Recovery bandwidth overhead above input rate (see [`SRTO_INPUTBW`](#SRTO_INPUTBW)), in percentage of the input rate. It is effective only if `SRTO_MAXBW` is set to 0.
 
-- *Sender: user configurable, default: 25%.* 
+- Sender: user configurable, default: 25%.
 
 - Recommendations:
+  - *Overhead is intended to give you extra bandwidth for the case when a packet has taken part of the bandwidth, but then was lost and has to be retransmitted. Therefore the effective maximum bandwidth should be appropriately higher than your stream's bitrate so that there's some room for retransmission, but still limited so that the retransmitted packets don't cause the bandwidth usage to skyrocket when larger groups of packets are lost*
+  - *Don't configure it too low and avoid 0 in the case when you have the `SRTO_INPUTBW` option set to 0 (automatic). Otherwise your stream will choke and break quickly at any rise in packet loss.*
 
-	- *Overhead is intended to give you extra bandwidth for the case when a packet 
-	has taken part of the bandwidth, but then was lost and has to be retransmitted. 
-	Therefore the effective maximum bandwidth should be appropriately higher than 
-	your stream's bitrate so that there's some room for retransmission, but still 
-	limited so that the retransmitted packets don't cause the bandwidth usage to 
-	skyrocket when larger groups of packets are lost*
-
-	- *Don't configure it too low and avoid 0 in the case when you have the 
-	`SRTO_INPUTBW` option set to 0 (automatic). Otherwise your stream will choke 
-	and break quickly at any rise in packet loss.*
-
-- ***To do: set-only; get should be supported.***
-
-
-[Return to list](#list-of-options)
-
-
+> ***To do: set-only; get should be supported.***
 
 #### SRTO_PACKETFILTER
 
@@ -607,16 +581,11 @@ parties are equivalent, and in order to have a working encrypted connection, the
 have to simply set the same passphrase. Otherwise the connection is rejected by 
 default (see also [`SRTO_ENFORCEDENCRYPTION`](#SRTO_ENFORCEDENCRYPTION)).
 
-
-[Return to list](#list-of-options)
-
-
-
 #### SRTO_PAYLOADSIZE
 
 | OptName              | Since | Binding | Type       |  Units  | Default  | Range  | Dir | Entity |
 | -------------------- | ----- | ------- | ---------- | ------- | -------- | ------ | --- | ------ |
-| `SRTO_PAYLOADSIZE`   | 1.3.0 | pre     | `int32_t`  | bytes   | *        | *      | W   | GSD    |
+| `SRTO_PAYLOADSIZE`   | 1.3.0 | pre     | `int32_t`  | bytes   | \*        | \*      | W   | GSD    |
 
 - Sets the maximum declared size of a single call to sending function in Live
 mode. When set to 0, there's no limit for a single sending call.
@@ -627,12 +596,6 @@ which decreases the maximum possible value for `SRTO_PAYLOADSIZE`.
 
 - For File mode: Default value is 0 and it's recommended not to be changed.
 
-
-
-[Return to list](#list-of-options)
-
-
-
 #### SRTO_PBKEYLEN
 
 | OptName              | Since | Binding | Type       |  Units  | Default  | Range  | Dir | Entity |
@@ -642,53 +605,24 @@ which decreases the maximum possible value for `SRTO_PAYLOADSIZE`.
 - Sender encryption key length.
 
 - Possible values:
-  -  0 =`PBKEYLEN` (default value)
-  - 16 = AES-128 (effective value) 
+  - 0  = `PBKEYLEN` (default value)
+  - 16 = AES-128 (effective value)
   - 24 = AES-192
   - 32 = AES-256
 
 - The use is slightly different in 1.2.0 (HSv4), and since 1.3.0 (HSv5):
 
-  - **HSv4**: This is set on the sender and enables encryption, if not 0. The receiver 
-  shall not set it and will agree on the length as defined by the sender.
+  - **HSv4**: This is set on the sender and enables encryption, if not 0. The receiver shall not set it and will agree on the length as defined by the sender.
   
-  - **HSv5**: The "default value" for `PBKEYLEN` is 0, which means that the 
-  `PBKEYLEN` won't be advertised. The "effective value" for `PBKEYLEN` is 16, but 
-  this applies only when neither party has set the value explicitly (i.e. when 
-  both are initially at the default value of 0). If any party *has* set an 
-  explicit value (16, 24, 32) it will be advertised in the handshake. If the other 
-  party remains at the default 0, it will accept the peer's value. The situation 
-  where both parties set a value should be treated carefully. Actually there are 
-  three intended methods of defining it, and all other uses are considered 
-  undefined behavior:
+  - **HSv5**: The "default value" for `PBKEYLEN` is 0, which means that the `PBKEYLEN` won't be advertised. The "effective value" for `PBKEYLEN` is 16, but this applies only when neither party has set the value explicitly (i.e. when both are initially at the default value of 0). If any party *has* set an explicit value (16, 24, 32) it will be advertised in the handshake. If the other party remains at the default 0, it will accept the peer's value. The situation where both parties set a value should be treated carefully. Actually there are three intended methods of defining it, and all other uses are considered undefined behavior:
   
-    - **Unidirectional**: the sender shall set `PBKEYLEN` and the receiver shall 
-    not alter the default value 0. The effective `PBKEYLEN` will be the one set 
-    on the sender. The receiver need not know the sender's `PBKEYLEN`, just the 
-    passphrase, `PBKEYLEN` will be correctly passed.
-    
-    - **Bidirectional in Caller-Listener arrangement**: it is recommended to use 
-    a rule whereby you will be setting the `PBKEYLEN` exclusively either on the 
-    Listener or on the Caller. The value set on the Listener will win, if set on 
-    both parties.
-    
-    - **Bidirectional in Rendezvous arrangement**: you have to know the passphrases 
-    for both parties, as well as `PBKEYLEN`. Set `PBKEYLEN` to the same value on 
-    both parties (or leave the default value on both parties, which will 
-    result in 16)
-    
-    - **Unwanted behavior cases**: if both parties set `PBKEYLEN` and the value 
-    on both sides is different, the effective `PBKEYLEN` will be the one that is 
-    set on the Responder party, which may also override the `PBKEYLEN` 32 set by 
-    the sender to value 16 if such value was used by the receiver. The Responder 
-    party is the Listener in a Caller-Listener arrangement. In Rendezvous it's a 
-    matter of luck which party becomes the Responder.
+    - **Unidirectional**: the sender shall set `PBKEYLEN` and the receiver shall not alter the default value 0. The effective `PBKEYLEN` will be the one set on the sender. The receiver need not know the sender's `PBKEYLEN`, just the passphrase, `PBKEYLEN` will be correctly passed.
 
+    - **Bidirectional in Caller-Listener arrangement**: it is recommended to use a rule whereby you will be setting the `PBKEYLEN` exclusively either on the Listener or on the Caller. The value set on the Listener will win, if set on both parties.
 
+    - **Bidirectional in Rendezvous arrangement**: you have to know the passphrases for both parties, as well as `PBKEYLEN`. Set `PBKEYLEN` to the same value on both parties (or leave the default value on both parties, which will result in 16)
 
-[Return to list](#list-of-options)
-
-
+    - **Unwanted behavior cases**: if both parties set `PBKEYLEN` and the value on both sides is different, the effective `PBKEYLEN` will be the one that is set on the Responder party, which may also override the `PBKEYLEN` 32 set by the sender to value 16 if such value was used by the receiver. The Responder party is the Listener in a Caller-Listener arrangement. In Rendezvous it's a matter of luck which party becomes the Responder.
 
 #### SRTO_PEERIDLETIMEO
 
@@ -711,16 +645,9 @@ considered broken on timeout.
 | -------------------- | ----- | ------- | ---------- | ------- | -------- | ------ | --- | ------ |
 | `SRTO_PEERLATENCY`   | 1.3.0 | pre     | `int32_t`  | ms      | 0        | 0..    | RW  | GSD    |
 
-- The latency value (as described in `SRTO_RCVLATENCY`) that is set by the sender 
-side as a minimum value for the receiver.
+- 数据发送方为接收方设置的最小接收延迟时间(`SRTO_RCVLATENCY`)。
 
-- Note that when reading, the value will report the preset value on a non-connected
-socket, and the effective value on a connected socket.
-
-
-[Return to list](#list-of-options)
-
-
+>请注意，读取时返回未连接套接字上的预设值，或是已连接套接字上的有效值。
 
 #### SRTO_PEERVERSION
 
@@ -728,14 +655,7 @@ socket, and the effective value on a connected socket.
 | -------------------- | ----- | ------- | ---------- | ------- | -------- | ------ | --- | ------ |
 | `SRTO_PEERVERSION`   | 1.1.0 |         | `int32_t`  | *       |          |        | R   | GS     |
 
-- SRT version used by the peer. The value 0 is returned if not connected, SRT 
-handshake not yet performed (HSv4 only), or if peer is not SRT. 
-See [`SRTO_VERSION`](#SRTO_VERSION) for the version format. 
-
-
-[Return to list](#list-of-options)
-
-
+- SRT version used by the peer. The value 0 is returned if not connected, SRT handshake not yet performed (HSv4 only), or if peer is not SRT. See [`SRTO_VERSION`](#SRTO_VERSION) for the version format.
 
 #### SRTO_RCVBUF
 
@@ -743,20 +663,11 @@ See [`SRTO_VERSION`](#SRTO_VERSION) for the version format.
 | -------------------- | ----- | ------- | ---------- | ------- | ---------- | ------ | --- | ------ |
 | `SRTO_RCVBUF`        |       | pre     | `int32_t`  | bytes   | 8192 bufs  | *      | RW  | GSD+   |
 
+- 接收缓冲区大小（字节）。但是这个值的内部设置是以缓冲区的数量为单位的（其实就是包数量），每个缓冲区的大小等于SRT有效负载大小，即`SRTO_MSS`的值减去UDP和SRT头大小（28和16）。此处设置的值将有效地与有效负载大小的倍数对齐。
+- 最小值：32个缓冲区（大概是46592(32x(1500-28-16))，默认值为`SRTO_MSS`）。
+- 最大值：`SRTO_FC`（接收器缓冲区不得大于飞行数据的大小）。
 
-- Receive Buffer Size, in bytes. Note, however, that the internal setting of this
-value is in the number of buffers, each one of size equal to SRT payload size,
-which is the value of `SRTO_MSS` decreased by UDP and SRT header sizes (28 and 16).
-The value set here will be effectively aligned to the multiple of payload size.
-
-- Minimum value: 32 buffers (46592 with default value of `SRTO_MSS`).
-- Maximum value: `SRTO_FC` number of buffers (receiver buffer must not be greater 
-  than the Flight Flag size).
-
-
-[Return to list](#list-of-options)
-
-
+> 这个参数控制每个SRT会话的接收缓冲区大小，也会在握手包中的`Flow Window`字段携带。
 
 #### SRTO_RCVDATA
 
@@ -765,11 +676,6 @@ The value set here will be effectively aligned to the multiple of payload size.
 | `SRTO_RCVDATA`    |       |         | `int32_t`  | pkts    |            |        | R   | S      |
 
 - Size of the available data in the receive buffer.
-
-
-[Return to list](#list-of-options)
-
-
 
 #### SRTO_RCVKMSTATE
 
@@ -792,31 +698,13 @@ The value set here will be effectively aligned to the multiple of payload size.
 | ----------------- | ----- | ------- | ---------- | ------- | ---------- | ------ | --- | ------ |
 | `SRTO_RCVLATENCY` | 1.3.0 | pre     | `int32_t`  | msec    | *          | 0..    | RW  | GSD    |
 
-- Latency value in the receiving direction. This value is only significant when
-`SRTO_TSBPDMODE` is set to true.
+- Latency value in the receiving direction. This value is only significant when`SRTO_TSBPDMODE` is set to true.
 
-- Latency refers to the time that elapses from the moment a packet is sent 
-to the moment when it's delivered to a receiver application. The SRT latency 
-setting should be a buffer large enough to cover the time spent for sending, 
-unexpectedly extended RTT time, and the time needed to retransmit any
-lost UDP packet. The effective latency value will be the maximum between the 
-`SRTO_RCVLATENCY` value and the value of `SRTO_PEERLATENCY` set by 
-the peer side. **This option in pre-1.3.0 version is available only as** 
-`SRTO_LATENCY`. Note that the real latency value may be slightly different 
-than this setting due to the impossibility of perfectly measuring exactly the 
-same point in time at both parties simultaneously. What is important with 
-latency is that its actual value, once set with the connection, is kept constant 
-throughout the duration of a connection.
+- Latency refers to the time that elapses from the moment a packet is sent to the moment when it's delivered to a receiver application. The SRT latency setting should be a buffer large enough to cover the time spent for sending, unexpectedly extended RTT time, and the time needed to retransmit any lost UDP packet. The effective latency value will be the maximum between the `SRTO_RCVLATENCY` value and the value of `SRTO_PEERLATENCY` set by the peer side. **This option in pre-1.3.0 version is available only as** `SRTO_LATENCY`. Note that the real latency value may be slightly different than this setting due to the impossibility of perfectly measuring exactly the same point in time at both parties simultaneously. What is important with latency is that its actual value, once set with the connection, is kept constant throughout the duration of a connection.
 
 - Default value: 120 in Live mode, 0 in File mode (see [`SRTO_TRANSTYPE`](#SRTO_TRANSTYPE)).
 
-- Note that when reading, the value will report the preset value on a non-connected
-socket, and the effective value on a connected socket.
-
-
-[Return to list](#list-of-options)
-
-
+- Note that when reading, the value will report the preset value on a non-connected socket, and the effective value on a connected socket.
 
 #### SRTO_RCVSYN
 
@@ -959,11 +847,6 @@ work. Setting `SRTO_MINVERSION` to 1.3.0 is therefore recommended.
 
 - Sender Buffer Size. See [`SRTO_RCVBUF`](#SRTO_RCVBUF) for more information.
 
-
-[Return to list](#list-of-options)
-
-
-
 #### SRTO_SNDDATA
 
 | OptName           | Since | Binding | Type       |  Units  |  Default  | Range  | Dir | Entity |
@@ -972,11 +855,6 @@ work. Setting `SRTO_MINVERSION` to 1.3.0 is therefore recommended.
 
 - Size of the unacknowledged data in send buffer.
 
-
-[Return to list](#list-of-options)
-
-
-
 #### SRTO_SNDDROPDELAY
 
 | OptName              | Since | Binding | Type       |  Units  |  Default  | Range  | Dir | Entity |
@@ -984,27 +862,14 @@ work. Setting `SRTO_MINVERSION` to 1.3.0 is therefore recommended.
 | `SRTO_SNDDROPDELAY`  | 1.3.2 | pre     | `int32_t`  | ms      | *         | -1..   | W   | GSD+   |
 
 - Sets an extra delay before `TLPKTDROP` is triggered on the data sender.
-This delay is added to the default drop delay time interval value. Keep in mind
-that the longer the delay, the more probable it becomes that packets would be
-retransmitted uselessly because they will be dropped by the receiver anyway.
+This delay is added to the default drop delay time interval value. Keep in mind that the longer the delay, the more probable it becomes that packets would be retransmitted uselessly because they will be dropped by the receiver anyway.
 
-- `TLPKTDROP` discards packets reported as lost if it is already too late to send 
-them (the receiver would discard them even if received). The delay before the 
-`TLPKTDROP` mechanism is triggered consists of the SRT latency (`SRTO_PEERLATENCY`), 
-plus `SRTO_SNDDROPDELAY`, plus `2 * interval between sending ACKs` (where the 
-default `interval between sending ACKs` is 10 milliseconds).
+- `TLPKTDROP` discards packets reported as lost if it is already too late to send them (the receiver would discard them even if received). The delay before the `TLPKTDROP` mechanism is triggered consists of the SRT latency (`SRTO_PEERLATENCY`), plus `SRTO_SNDDROPDELAY`, plus `2 * interval between sending ACKs` (where the default `interval between sending ACKs` is 10 milliseconds).
 The minimum delay is `1000 + 2 * interval between sending ACKs` milliseconds.
 
-- **Special value -1**: Do not drop packets on the sender at all (retransmit them 
-  always when requested).
+- **Special value -1**: Do not drop packets on the sender at all (retransmit them always when requested).
 
 - Default: 0 in Live mode, -1 in File mode.
-
-
-
-[Return to list](#list-of-options)
-
-
 
 #### SRTO_SNDKMSTATE
 
